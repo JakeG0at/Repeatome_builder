@@ -8,6 +8,8 @@
 #SBATCH -o Repeatome_%j.o
 
 echo "Starting the pipeline at $(date)"
+#usage = Repeatome_Pipeline3.sh <fasta_file>
+# The input fasta file should be paired end and interleaved with duplicates removed
 
 Fasta=$1
 Base=$(basename "$Fasta" .fasta)
@@ -18,44 +20,21 @@ ProjectDir="/home/jlamb1/Projects/Repeatome/$Base"
 
 [ ! -d "$ProjectDir" ] && mkdir -p "$ProjectDir"
 
+cp "$Fasta" "$ProjectDir"
+
 cd "$ProjectDir" || { echo "Failed to change directory to $ProjectDir"; exit 1; }
+#copy the fasta file to the project directory
 
 zero_SATS_count=0
 zero_LTRS_count=0
 Num_of_runs=0
-
-# Check for deduplication condition
-if [ "$dedup" = "T" ] || [ "$dedup" = "TRUE" ]; then
-    Read1=$1
-    Read2=$2
-
-    echo "Removing duplicates..."
-    /home/jlamb1/bin/bbmap/clumpify.sh in1=$Read1 in2=$Read2 out=${Base}.fastq int=t dedupe=t
-
-    [ $? -ne 0 ] && { echo "Error during duplicate removal with clumpify. Exiting."; exit 1; }
-fi
-
 
 while :; do
     Num_of_runs=$((Num_of_runs + 1))
 
     # Take a random sample of 1 million reads
     echo "Sampling 1 million reads..."
-    seqtk sample -s100 ${Base}.fastq 1000000 > ${Base}_sample.fasta
-
-    # Check if seqtk sample was successful
-    if [ $? -ne 0 ]; then
-        echo "Error during sampling with seqtk. Exiting."
-        exit 1
-    fi
-
-    seqtk seq -A  -s100 ${Base}_sample.fastq > ${Base}_sample.fasta
-
-    # Check if seqtk sample was successful
-    if [ $? -ne 0 ]; then
-        echo "Error converting fastq to fasta with seqtk. Exiting."
-        exit 1
-    fi
+    seqtk sample -s100 ${Base}.fasta 1000000 > ${Base}_sample.fasta
 
     # Run repeat explorer
     echo "Running Repeat Explorer..."
@@ -69,7 +48,7 @@ while :; do
     fi
 
     # Deactivate the conda environment
-    source deactivate
+    conda deactivate
 
     # Find the number of Repeats found
     high_conf_SATs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_1.fasta)
@@ -110,29 +89,39 @@ while :; do
 
     # Index the reads
     bwa index ${Base}.fasta
+    echo "Mapping reads to the library..."
 
     # Map the reads
     bwa mem ${Base}.fasta "$LibraryFile" > ${Base}_${Num_of_runs}_alignment.sam
+    echo "Done mapping reads to the library"
 
     # Convert SAM to BAM
     samtools view -S -b ${Base}_${Num_of_runs}_alignment.sam > ${Base}_${Num_of_runs}_alignment.bam
+    echo "Done converting SAM to BAM"
 
     # Sort the BAM file
     samtools sort ${Base}_${Num_of_runs}_alignment.bam -o ${Base}_${Num_of_runs}_sorted_alignment.bam
+    echo "Done sorting BAM file"
 
     # Filter out mapped reads
     samtools view -b -F 4 ${Base}_${Num_of_runs}_sorted_alignment.bam > ${Base}_${Num_of_runs}_mapped_reads.bam
+    echo "Done filtering out mapped reads"
 
     # Get list of mapped read names
     samtools view ${Base}_${Num_of_runs}_mapped_reads.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names.txt
-
+    echo "Done getting list of mapped read names"
     # Use seqtk to filter out mapped reads from the original FASTA
     seqtk subseq ${Base}.fasta ${Base}_${Num_of_runs}_mapped_read_names.txt > ${Base}_${Num_of_runs}_filtered.fasta
+    echo "Done filtering out mapped reads from the original FASTA"
 
     # Deactivate conda
-    source deactivate
+    conda deactivate
+
 
     mv ${Base}_${Num_of_runs}_filtered.fasta ${Base}.fasta 
+    echo "Done moving filtered FASTA to original FASTA"
+    
     rm ${Base}_${Num_of_runs}_alignment.sam ${Base}_${Num_of_runs}_alignment.bam ${Base}_${Num_of_runs}_sorted_alignment.bam ${Base}_${Num_of_runs}_mapped_reads.bam ${Base}_${Num_of_runs}_mapped_read_names.txt
 
+    echo "Temp files removed"
 done
