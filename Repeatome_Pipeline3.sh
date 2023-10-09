@@ -10,18 +10,18 @@ echo "Starting the pipeline at $(date)"
 # I will hard code the file names for now
 
 #copy the raw fastq files to the project directory
-cp /home/jlamb1/SRA_seqs/SRX19958881_N1.fastq.gz /home/jlamb1/Projects/Repeatome/SRX19958881/ &
-cp /home/jlamb1/SRA_seqs/SRX19958881_N2.fastq.gz /home/jlamb1/Projects/Repeatome/SRX19958881/ &
-wait
+#cp /home/jlamb1/SRA_seqs/SRX19958881_N1.fastq.gz /home/jlamb1/Projects/Repeatome/SRX19958881/ &
+#cp /home/jlamb1/SRA_seqs/SRX19958881_N2.fastq.gz /home/jlamb1/Projects/Repeatome/SRX19958881/ &
+#wait
 
 #gunzip the files if they are gzipped
-if [ -f /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq.gz ]; then
-    echo "Unzipping the files"
-    gunzip /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq.gz &
-    gunzip /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N2.fastq.gz &
-    wait
-    echo "Done unzipping the files"
-fi
+#if [ -f /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq.gz ]; then
+   #echo "Unzipping the files"
+    #gunzip /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq.gz &
+   # gunzip /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N2.fastq.gz &
+    #wait
+  #  echo "Done unzipping the files"
+#fi
 
 read1="/home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq"
 read2="/home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N2.fastq"
@@ -33,7 +33,7 @@ echo "Processing samples with base name: $Base"
 ProjectDir="/home/jlamb1/Projects/Repeatome/$Base"
 [ ! -d "$ProjectDir" ] && mkdir -p "$ProjectDir"
 cd "$ProjectDir" || { echo "Failed to change directory to $ProjectDir"; exit 1; }
-
+mkdir -p "$ProjectDir"/Repeat_explorer_outputs
 zero_SATS_count=0
 zero_LTRS_count=0
 Num_of_runs=0
@@ -95,7 +95,7 @@ while :; do
     high_conf_SATs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_1.fasta) &
     high_conf_LTRs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_3.fasta) &
     wait
-    
+
     echo "There were $high_conf_SATs high confidence SATs found"
     echo "There were $high_conf_LTRs high confidence LTRs found"
 
@@ -127,6 +127,11 @@ while :; do
     source activate /home/jlamb1/bin/miniconda3/envs/bowtie2 || { echo "Failed to activate conda environment"; exit 1; }
     # Append the files to the library
     cat ./re_output/TAREAN_consensus_rank_1.fasta ./re_output/TAREAN_consensus_rank_3.fasta >> "$LibraryFile"
+    
+    #move the re_output directory to the Repeat_explorer_outputs directory and add the number of runs to the end of the directory name
+    mv ./re_output "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs} 
+    # Gzip the files inside the re_output_${Num_of_runs}
+    gzip "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs}/*
 
     # Index read1 and read2 fastq files
     echo "Indexing the reads..."
