@@ -133,7 +133,7 @@ while :; do
 
     # Ensure the reference library is indexed
 echo "Indexing the reference library..."
-bwa index -a bwtsw "$LibraryFile"
+bwa index "$LibraryFile"
 echo "Done indexing the reference library"
 
 echo "Mapping reads to the library..."
