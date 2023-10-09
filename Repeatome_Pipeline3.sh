@@ -6,6 +6,9 @@
 #SBATCH -N 1 #nodes
 #SBATCH -o Repeatome_%j.o
 threads=32
+#divide the number of threads by 2
+threads2=$((threads / 2))
+
 echo "Starting the pipeline at $(date)"
 # I will hard code the file names for now
 
@@ -128,54 +131,53 @@ while :; do
     # Append the files to the library
     cat ./re_output/TAREAN_consensus_rank_1.fasta ./re_output/TAREAN_consensus_rank_3.fasta >> "$LibraryFile"
 
-    # Index read1 and read2 fastq files
-    echo "Indexing the reads..."
-    bwa index $read1 &
-    bwa index $read2 &
-    wait
-    echo "Done indexing the reads"
+    # Ensure the reference library is indexed
+echo "Indexing the reference library..."
+bwa index -a bwtsw "$LibraryFile"
+echo "Done indexing the reference library"
 
-    echo "Mapping reads to the library..."
-    # Map read1 and read2 to the library
-    bwa mem -t $threads "$LibraryFile" $read1 > ${Base}_${Num_of_runs}_alignment1.sam &
-    bwa mem -t $threads "$LibraryFile" $read2 > ${Base}_${Num_of_runs}_alignment2.sam &
-    wait
-    echo "Done mapping reads to the library"
+echo "Mapping reads to the library..."
+# Map read1 and read2 to the library
+bwa mem -t $threads2 "$LibraryFile" $read1 > ${Base}_${Num_of_runs}_alignment1.sam &
+bwa mem -t $threads2 "$LibraryFile" $read2 > ${Base}_${Num_of_runs}_alignment2.sam &
+wait
+echo "Done mapping reads to the library"
 
-    # Convert SAM to BAM
-    echo "Converting SAM to BAM..."
-    samtools view -@ $threads -S -b ${Base}_${Num_of_runs}_alignment1.sam > ${Base}_${Num_of_runs}_alignment1.bam &
-    samtools view -@ $threads -S -b ${Base}_${Num_of_runs}_alignment2.sam > ${Base}_${Num_of_runs}_alignment2.bam &
-    wait
-    echo "Done converting SAM to BAM"
+# Convert SAM to BAM
+echo "Converting SAM to BAM..."
+samtools view -@ $threads2 -S -b ${Base}_${Num_of_runs}_alignment1.sam > ${Base}_${Num_of_runs}_alignment1.bam &
+samtools view -@ $threads2 -S -b ${Base}_${Num_of_runs}_alignment2.sam > ${Base}_${Num_of_runs}_alignment2.bam &
+wait
+echo "Done converting SAM to BAM"
 
-    # Sort the BAM file
-    echo "Sorting BAM file..."
-    samtools sort -@ $threads ${Base}_${Num_of_runs}_alignment1.bam -o ${Base}_${Num_of_runs}_alignment1_sorted.bam &
-    samtools sort -@ $threads ${Base}_${Num_of_runs}_alignment2.bam -o ${Base}_${Num_of_runs}_alignment2_sorted.bam &
-    wait
-    echo "Done sorting BAM file"
+# Sort the BAM file
+echo "Sorting BAM file..."
+samtools sort -@ $threads2 ${Base}_${Num_of_runs}_alignment1.bam -o ${Base}_${Num_of_runs}_alignment1_sorted.bam &
+samtools sort -@ $threads2 ${Base}_${Num_of_runs}_alignment2.bam -o ${Base}_${Num_of_runs}_alignment2_sorted.bam &
+wait
+echo "Done sorting BAM file"
 
-    # Filter out mapped reads
-    echo "Filtering out mapped reads..."
-    samtools view -@ $threads -b -F 4 ${Base}_${Num_of_runs}_alignment1_sorted.bam > ${Base}_${Num_of_runs}_mapped_reads1.bam &
-    samtools view -@ $threads -b -F 4 ${Base}_${Num_of_runs}_alignment2_sorted.bam > ${Base}_${Num_of_runs}_mapped_reads2.bam &
-    wait
-    echo "Done filtering out mapped reads"
+# Filter out mapped reads
+echo "Filtering out mapped reads..."
+samtools view -@ $threads2 -b -F 4 ${Base}_${Num_of_runs}_alignment1_sorted.bam > ${Base}_${Num_of_runs}_mapped_reads1.bam &
+samtools view -@ $threads2 -b -F 4 ${Base}_${Num_of_runs}_alignment2_sorted.bam > ${Base}_${Num_of_runs}_mapped_reads2.bam &
+wait
+echo "Done filtering out mapped reads"
 
-    # Get list of mapped read names
-    echo "Getting list of mapped read names..."
-    samtools view -@ $threads ${Base}_${Num_of_runs}_mapped_reads1.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names1.txt &
-    samtools view -@ $threads ${Base}_${Num_of_runs}_mapped_reads2.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names2.txt &
-    wait
-    echo "Done getting list of mapped read names"
+# Get list of mapped read names
+echo "Getting list of mapped read names..."
+samtools view -@ $threads2 ${Base}_${Num_of_runs}_mapped_reads1.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names1.txt &
+samtools view -@ $threads2 ${Base}_${Num_of_runs}_mapped_reads2.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names2.txt &
+wait
+echo "Done getting list of mapped read names"
 
-    # Use seqtk to filter out mapped reads from the original FASTQ files
-    echo "Filtering out mapped reads from the original FASTQ files Read1 and Read2"
-    seqtk subseq $read1 ${Base}_${Num_of_runs}_mapped_read_names1.txt > ${Base}_${Num_of_runs}_filtered1.fastq &
-    seqtk subseq $read2 ${Base}_${Num_of_runs}_mapped_read_names2.txt > ${Base}_${Num_of_runs}_filtered2.fastq &
-    wait
-    echo "Done filtering out mapped reads from the original FASTQ files Read1 and Read2"
+# Use seqtk to filter out mapped reads from the original FASTQ files
+echo "Filtering out mapped reads from the original FASTQ files Read1 and Read2"
+seqtk subseq $read1 ${Base}_${Num_of_runs}_mapped_read_names1.txt > ${Base}_${Num_of_runs}_filtered1.fastq &
+seqtk subseq $read2 ${Base}_${Num_of_runs}_mapped_read_names2.txt > ${Base}_${Num_of_runs}_filtered2.fastq &
+wait
+echo "Done filtering out mapped reads from the original FASTQ files Read1 and Read2"
+
 
     # Deactivate conda
     conda deactivate || { echo "Failed to deactivate conda environment"; exit 1; }
