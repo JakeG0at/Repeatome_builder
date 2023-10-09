@@ -1,29 +1,38 @@
 #!/bin/bash
-
 #SBATCH --job-name=Repeatome
 #SBATCH --cpus-per-task=32
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jlamb@crimson.ua.edu
 #SBATCH -N 1 #nodes
 #SBATCH -o Repeatome_%j.o
-
+threads=32
 echo "Starting the pipeline at $(date)"
-#usage = Repeatome_Pipeline3.sh <fasta_file>
-# The input fasta file should be paired end and interleaved with duplicates removed
+# I will hard code the file names for now
 
-Fasta=$1
-Base=$(basename "$Fasta" .fasta)
+#copy the raw fastq files to the project directory
+cp /home/jlamb1/SRA_seqs/SRX19958881_N1.fastq.gz /home/jlamb1/Projects/Repeatome/SRX19958881/ &
+cp /home/jlamb1/SRA_seqs/SRX19958881_N2.fastq.gz /home/jlamb1/Projects/Repeatome/SRX19958881/ &
+wait
 
+#gunzip the files if they are gzipped
+if [ -f /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq.gz ]; then
+    echo "Unzipping the files"
+    gunzip /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq.gz &
+    gunzip /home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N2.fastq.gz &
+    wait
+    echo "Done unzipping the files"
+fi
+
+read1="/home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N1.fastq"
+read2="/home/jlamb1/Projects/Repeatome/SRX19958881/SRX19958881_N2.fastq"
+
+#take the basename of the file and use that as the base name for the project directory
+Base=$(basename "$read1" _N1.fastq)
 echo "Processing samples with base name: $Base"
 
 ProjectDir="/home/jlamb1/Projects/Repeatome/$Base"
-
 [ ! -d "$ProjectDir" ] && mkdir -p "$ProjectDir"
-
-cp "$Fasta" "$ProjectDir"
-
 cd "$ProjectDir" || { echo "Failed to change directory to $ProjectDir"; exit 1; }
-#copy the fasta file to the project directory
 
 zero_SATS_count=0
 zero_LTRS_count=0
@@ -32,28 +41,61 @@ Num_of_runs=0
 while :; do
     Num_of_runs=$((Num_of_runs + 1))
 
+    echo "Fixing the reads..."
+    /home/jlamb1/bin/bbmap/repair.sh in1=$read1 in2=$read2 out1=${Base}_N1_fixed.fastq out2=${Base}_N2_fixed.fastq outs=${Base}_singletons.fastq ow=true threads=$threads
+    echo "Done fixing the reads"
+
+    # Update the read1 and read2 variables to point to the fixed files
+    read1="${Base}_N1_fixed.fastq"
+    read2="${Base}_N2_fixed.fastq"
+
     # Take a random sample of 1 million reads
     echo "Sampling 1 million reads..."
-    seqtk sample -s100 ${Base}.fasta 1000000 > ${Base}_sample.fasta
+    seqtk sample -s100 $read1 500000 > sub1.fastq &
+    seqtk sample -s100 $read2 500000 > sub2.fastq &
+    wait
+
+    # Get the headers from the sampled reads
+    grep "^@" sub1.fastq | sed 's/^@//' > headers1.txt &
+    grep "^@" sub2.fastq | sed 's/^@//' > headers2.txt &
+    wait
+    # Combine the headers from both files
+    cat headers1.txt headers2.txt > headers.txt
+
+    #remove matching headers from read1 and read2
+    grep -v -F -f headers.txt $read1 > filtered1.fastq &
+    grep -v -F -f headers.txt $read2 > filtered2.fastq &
+    wait
+    #Change file names to original names
+    mv filtered1.fastq $read1
+    mv filtered2.fastq $read2
+
+    #Convert to fasta that is merged and interleaved
+    echo "Converting to interleaved fasta"
+    seqtk mergepe sub1.fastq sub2.fastq > merged.fastq
+    seqtk seq -A merged.fastq > ${Base}_sample.fasta
 
     # Run repeat explorer
     echo "Running Repeat Explorer..."
-    source activate /home/jlamb1/bin/miniconda3/envs/eccsplorer
-    /home/jlamb1/bin/repex_tarean/seqclust -p -A -v ./re_output -s 1000000 -c 32 -C -tax METAZOA3.0 -D BLASTX_W2 ${Base}_sample.fasta
+    source activate /home/jlamb1/bin/miniconda3/envs/eccsplorer || { echo "Failed to activate conda environment"; exit 1; }
 
+    /home/jlamb1/bin/repex_tarean/seqclust -p -A -v ./re_output -s 1000000 -c $threads -C -tax METAZOA3.0 -D BLASTX_W2 ${Base}_sample.fasta
     # Check if Repeat Explorer was successful
-    if [ $? -ne 0 ]; then
-        echo "Error during Repeat Explorer execution. Exiting."
+    if [ $? -eq 0 ]; then
+        echo "Repeat Explorer was successful"
+    else
+        echo "Repeat Explorer failed"
         exit 1
     fi
 
     # Deactivate the conda environment
-    conda deactivate
+    conda deactivate || { echo "Failed to deactivate conda environment"; exit 1; }
 
     # Find the number of Repeats found
-    high_conf_SATs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_1.fasta)
-    high_conf_LTRs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_3.fasta)
-
+    high_conf_SATs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_1.fasta) &
+    high_conf_LTRs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_3.fasta) &
+    wait
+    
     echo "There were $high_conf_SATs high confidence SATs found"
     echo "There were $high_conf_LTRs high confidence LTRs found"
 
@@ -69,8 +111,8 @@ while :; do
         zero_LTRS_count=$((zero_LTRS_count + 1))
     fi
 
-    # Check if two consecutive iterations returned 0 for both SATS and LTRS or if the loop has run for more than, say, 10 times
-    if [ $zero_SATS_count -ge 2 ] && [ $zero_LTRS_count -ge 2 ] || [ $Num_of_runs -gt 10 ]; then
+    # Check if two consecutive iterations returned 0 for both SATS and LTRS
+    if [ $zero_SATS_count -ge 2 ] && [ $zero_LTRS_count -ge 2 ]; then
         echo "Two consecutive iterations with zero high confidence SATs and LTRs found, or max run limit reached. Exiting."
         break
     fi
@@ -82,46 +124,72 @@ while :; do
     fi
 
     # Activate conda env
-    source activate /home/jlamb1/bin/miniconda3/envs/bowtie2
-
+    source activate /home/jlamb1/bin/miniconda3/envs/bowtie2 || { echo "Failed to activate conda environment"; exit 1; }
     # Append the files to the library
     cat ./re_output/TAREAN_consensus_rank_1.fasta ./re_output/TAREAN_consensus_rank_3.fasta >> "$LibraryFile"
 
-    # Index the reads
-    bwa index ${Base}.fasta
-    echo "Mapping reads to the library..."
+    # Index read1 and read2 fastq files
+    echo "Indexing the reads..."
+    bwa index $read1 &
+    bwa index $read2 &
+    wait
+    echo "Done indexing the reads"
 
-    # Map the reads
-    bwa mem ${Base}.fasta "$LibraryFile" > ${Base}_${Num_of_runs}_alignment.sam
+    echo "Mapping reads to the library..."
+    # Map read1 and read2 to the library
+    bwa mem -t $threads "$LibraryFile" $read1 > ${Base}_${Num_of_runs}_alignment1.sam &
+    bwa mem -t $threads "$LibraryFile" $read2 > ${Base}_${Num_of_runs}_alignment2.sam &
+    wait
     echo "Done mapping reads to the library"
 
     # Convert SAM to BAM
-    samtools view -S -b ${Base}_${Num_of_runs}_alignment.sam > ${Base}_${Num_of_runs}_alignment.bam
+    echo "Converting SAM to BAM..."
+    samtools view -@ $threads -S -b ${Base}_${Num_of_runs}_alignment1.sam > ${Base}_${Num_of_runs}_alignment1.bam &
+    samtools view -@ $threads -S -b ${Base}_${Num_of_runs}_alignment2.sam > ${Base}_${Num_of_runs}_alignment2.bam &
+    wait
     echo "Done converting SAM to BAM"
 
     # Sort the BAM file
-    samtools sort ${Base}_${Num_of_runs}_alignment.bam -o ${Base}_${Num_of_runs}_sorted_alignment.bam
+    echo "Sorting BAM file..."
+    samtools sort -@ $threads ${Base}_${Num_of_runs}_alignment1.bam -o ${Base}_${Num_of_runs}_alignment1_sorted.bam &
+    samtools sort -@ $threads ${Base}_${Num_of_runs}_alignment2.bam -o ${Base}_${Num_of_runs}_alignment2_sorted.bam &
+    wait
     echo "Done sorting BAM file"
 
     # Filter out mapped reads
-    samtools view -b -F 4 ${Base}_${Num_of_runs}_sorted_alignment.bam > ${Base}_${Num_of_runs}_mapped_reads.bam
+    echo "Filtering out mapped reads..."
+    samtools view -@ $threads -b -F 4 ${Base}_${Num_of_runs}_alignment1_sorted.bam > ${Base}_${Num_of_runs}_mapped_reads1.bam &
+    samtools view -@ $threads -b -F 4 ${Base}_${Num_of_runs}_alignment2_sorted.bam > ${Base}_${Num_of_runs}_mapped_reads2.bam &
+    wait
     echo "Done filtering out mapped reads"
 
     # Get list of mapped read names
-    samtools view ${Base}_${Num_of_runs}_mapped_reads.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names.txt
+    echo "Getting list of mapped read names..."
+    samtools view -@ $threads ${Base}_${Num_of_runs}_mapped_reads1.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names1.txt &
+    samtools view -@ $threads ${Base}_${Num_of_runs}_mapped_reads2.bam | cut -f1 > ${Base}_${Num_of_runs}_mapped_read_names2.txt &
+    wait
     echo "Done getting list of mapped read names"
-    # Use seqtk to filter out mapped reads from the original FASTA
-    seqtk subseq ${Base}.fasta ${Base}_${Num_of_runs}_mapped_read_names.txt > ${Base}_${Num_of_runs}_filtered.fasta
-    echo "Done filtering out mapped reads from the original FASTA"
+
+    # Use seqtk to filter out mapped reads from the original FASTQ files
+    echo "Filtering out mapped reads from the original FASTQ files Read1 and Read2"
+    seqtk subseq $read1 ${Base}_${Num_of_runs}_mapped_read_names1.txt > ${Base}_${Num_of_runs}_filtered1.fastq &
+    seqtk subseq $read2 ${Base}_${Num_of_runs}_mapped_read_names2.txt > ${Base}_${Num_of_runs}_filtered2.fastq &
+    wait
+    echo "Done filtering out mapped reads from the original FASTQ files Read1 and Read2"
 
     # Deactivate conda
-    conda deactivate
-
-
-    mv ${Base}_${Num_of_runs}_filtered.fasta ${Base}.fasta 
+    conda deactivate || { echo "Failed to deactivate conda environment"; exit 1; }
     echo "Done moving filtered FASTA to original FASTA"
-    
-    rm ${Base}_${Num_of_runs}_alignment.sam ${Base}_${Num_of_runs}_alignment.bam ${Base}_${Num_of_runs}_sorted_alignment.bam ${Base}_${Num_of_runs}_mapped_reads.bam ${Base}_${Num_of_runs}_mapped_read_names.txt
-
+    rm ${Base}_${Num_of_runs}_mapped_read_names2.txt ${Base}_${Num_of_runs}_mapped_read_names1.txt &
+    rm ${Base}_${Num_of_runs}_mapped_reads2.bam ${Base}_${Num_of_runs}_mapped_reads1.bam &
+    rm ${Base}_${Num_of_runs}_alignment2_sorted.bam ${Base}_${Num_of_runs}_alignment1_sorted.bam &
+    rm ${Base}_${Num_of_runs}_alignment2.bam ${Base}_${Num_of_runs}_alignment1.bam &
+    rm ${Base}_${Num_of_runs}_alignment2.sam ${Base}_${Num_of_runs}_alignment1.sam &
+    wait
     echo "Temp files removed"
+    
+    # Move the filtered reads to the original read names
+    mv ${Base}_${Num_of_runs}_filtered1.fastq $read1 &
+    mv ${Base}_${Num_of_runs}_filtered2.fastq $read2 &
+    wait
 done
