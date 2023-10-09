@@ -127,11 +127,6 @@ while :; do
     source activate /home/jlamb1/bin/miniconda3/envs/bowtie2 || { echo "Failed to activate conda environment"; exit 1; }
     # Append the files to the library
     cat ./re_output/TAREAN_consensus_rank_1.fasta ./re_output/TAREAN_consensus_rank_3.fasta >> "$LibraryFile"
-    
-    #move the re_output directory to the Repeat_explorer_outputs directory and add the number of runs to the end of the directory name
-    mv ./re_output "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs} 
-    # Gzip the files inside the re_output_${Num_of_runs}
-    gzip "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs}/*
 
     # Index read1 and read2 fastq files
     echo "Indexing the reads..."
@@ -193,6 +188,11 @@ while :; do
     wait
     echo "Temp files removed"
     
+    #move the re_output directory to the Repeat_explorer_outputs directory and add the number of runs to the end of the directory name
+    mv ./re_output "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs} 
+    # Gzip the files inside the re_output_${Num_of_runs}
+    gzip "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs}/*
+
     # Move the filtered reads to the original read names
     mv ${Base}_${Num_of_runs}_filtered1.fastq $read1 &
     mv ${Base}_${Num_of_runs}_filtered2.fastq $read2 &
