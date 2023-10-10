@@ -1,5 +1,5 @@
 
-# Each itteration takes around 1 hour to 1million reads 32 threads
+# Each itteration takes around 1 hour for 1million reads 32 threads
 
 # Biggest improvement would be to rewrite RepeatExplorer in Rust and add GPU_Blast support
 # Probably a 10x improvement in speed and efficiency
