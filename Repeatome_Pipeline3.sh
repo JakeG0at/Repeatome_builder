@@ -95,8 +95,8 @@ while :; do
     conda deactivate || { echo "Failed to deactivate conda environment"; exit 1; }
 
     # Find the number of Repeats found
-    high_conf_SATs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_1.fasta) &
-    high_conf_LTRs=$(grep -c "^>" ./re_output/TAREAN_consensus_rank_3.fasta) &
+    high_conf_SATs=$(grep -c "^>" /home/jlamb1/Projects/Repeatome/SRX19958881/re_output/TAREAN_consensus_rank_1.fasta) &
+    high_conf_LTRs=$(grep -c "^>" /home/jlamb1/Projects/Repeatome/SRX19958881/re_output/TAREAN_consensus_rank_3.fasta) &
     wait
 
     echo "There were $high_conf_SATs high confidence SATs found"
@@ -125,11 +125,13 @@ while :; do
     if [ ! -f "$LibraryFile" ]; then
         touch "$LibraryFile"
     fi
-
+    
+    #echo the number of sequences in the library file on each iteration
+    echo "There are $(grep -c "^>" "$LibraryFile") sequences in the library file on itteration $Num_of_runs"
     # Activate conda env
     source activate /home/jlamb1/bin/miniconda3/envs/bowtie2 || { echo "Failed to activate conda environment"; exit 1; }
     # Append the files to the library
-    cat ./re_output/TAREAN_consensus_rank_1.fasta ./re_output/TAREAN_consensus_rank_3.fasta >> "$LibraryFile"
+    cat /home/jlamb1/Projects/Repeatome/SRX19958881/re_output/TAREAN_consensus_rank_1.fasta /home/jlamb1/Projects/Repeatome/SRX19958881/re_output/TAREAN_consensus_rank_3.fasta >> "$LibraryFile"
 
     # Ensure the reference library is indexed
 echo "Indexing the reference library..."
@@ -178,10 +180,12 @@ seqtk subseq $read2 ${Base}_${Num_of_runs}_mapped_read_names2.txt > ${Base}_${Nu
 wait
 echo "Done filtering out mapped reads from the original FASTQ files Read1 and Read2"
 
-
     # Deactivate conda
     conda deactivate || { echo "Failed to deactivate conda environment"; exit 1; }
     echo "Done moving filtered FASTA to original FASTA"
+    #remove temp files, but add a check to see if they exist first
+    echo "Removing temp files"
+
     rm ${Base}_${Num_of_runs}_mapped_read_names2.txt ${Base}_${Num_of_runs}_mapped_read_names1.txt &
     rm ${Base}_${Num_of_runs}_mapped_reads2.bam ${Base}_${Num_of_runs}_mapped_reads1.bam &
     rm ${Base}_${Num_of_runs}_alignment2_sorted.bam ${Base}_${Num_of_runs}_alignment1_sorted.bam &
@@ -193,7 +197,9 @@ echo "Done filtering out mapped reads from the original FASTQ files Read1 and Re
     #move the re_output directory to the Repeat_explorer_outputs directory and add the number of runs to the end of the directory name
     mv ./re_output "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs} 
     # Gzip the files inside the re_output_${Num_of_runs}
-    gzip "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs}/*
+    for file in /path/to/files/*; do
+    [[ $file != *.gz ]] && gzip $file
+    done
 
     # Move the filtered reads to the original read names
     mv ${Base}_${Num_of_runs}_filtered1.fastq $read1 &
