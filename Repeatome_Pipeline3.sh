@@ -209,17 +209,18 @@ echo "Done getting list of mapped read names in $runtime seconds"
 
 # Use seqtk to filter out mapped reads from the original FASTQ files
 echo "Filtering out mapped reads from the original FASTQ files Read1 and Read2"
+start=$(date +%s.%N)
 seqtk subseq "$read1" "${Base}"_${Num_of_runs}_mapped_read_names1.txt > "${Base}"_${Num_of_runs}_filtered1.fastq &
 seqtk subseq "$read2" "${Base}"_${Num_of_runs}_mapped_read_names2.txt > "${Base}"_${Num_of_runs}_filtered2.fastq &
 wait
-echo "Done filtering out mapped reads from the original FASTQ files Read1 and Read2"
+end=$(date +%s.%N)
+echo "Done filtering out mapped reads from the original FASTQ files Read1 and Read2 in $runtime seconds"
 
 # Deactivate conda
 conda deactivate || { echo "Failed to deactivate conda environment"; exit 1; }
 echo "Done moving filtered FASTA to original FASTA"
 #remove temp files, but add a check to see if they exist first
 echo "Removing temp files"
-
 rm "${Base}"_${Num_of_runs}_mapped_read_names2.txt "${Base}"_${Num_of_runs}_mapped_read_names1.txt &
 rm "${Base}"_${Num_of_runs}_mapped_reads2.bam "${Base}"_${Num_of_runs}_mapped_reads1.bam &
 rm "${Base}"_${Num_of_runs}_alignment2.bam "${Base}"_${Num_of_runs}_alignment1.bam &
