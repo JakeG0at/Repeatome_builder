@@ -58,7 +58,7 @@ Num_of_runs=0
 
 while :; do
 Num_of_runs=$((Num_of_runs + 1))
-
+echo "Starting iteration $Num_of_runs"
 echo "Fixing the reads..."
 /home/jlamb1/bin/bbmap/repair.sh in1="$read1" in2="$read2" out1="${Base}"_N1_fixed.fastq out2="${Base}"_N2_fixed.fastq outs="${Base}"_singletons.fastq ow=true threads=$threads
 #if the singletons file exists, then remove it
