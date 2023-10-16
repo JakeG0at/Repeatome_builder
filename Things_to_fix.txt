@@ -1,0 +1,4 @@
+
+
+# I need to do manual checks to make sure that the sampled reads are removed from original
+# for instance reduction in 4 million reads after sampling
