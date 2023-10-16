@@ -32,11 +32,11 @@ runtime=$(echo "$end - $start" | bc)
 echo "Done copying files to Directory in $runtime seconds"
 
 #if /home/jlamb1/SRA_seqs/"$Base"_N1 and N2.fastq exists, then remove the file
-if [ -f /home/jlamb1/SRA_seqs/"$Base"_N1.fastq ]; then
-rm /home/jlamb1/SRA_SRX19958881seqs/"$Base"_N1.fastq
+if [ -f /home/jlamb1/Projects/Repeatome/"$Base"/"$Base"_N1.fastq ]; then
+rm /home/jlamb1/Projects/Repeatome/"$Base"/"$Base"_N1.fastq
 fi
-if [ -f /home/jlamb1/SRA_seqs/"$Base"_N2.fastq ]; then
-rm /home/jlamb1/SRA_seqs/"$Base"_N2.fastq
+if [ -f /home/jlamb1/Projects/Repeatome/"$Base"/"$Base"_N2.fastq ]; then
+rm /home/jlamb1/Projects/Repeatome/"$Base"/"$Base"_N2.fastq
 echo "Removed existing fastq files"
 fi
 
