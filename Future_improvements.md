@@ -11,5 +11,5 @@
 # Make one conda environment so I dont have to activate and deactive two seperate condas
 
 
-# Would it be possible to first use the salamander repeat library to filter out the TE reads, and then use the remaining reads to build a new library. This would potentially limit the specificity, but could reduce the complexity.
-
+# Would it be possible to first use the salamander repeat library to filter out the TE reads, and then use the remaining reads to build a new library. 
+# This would potentially limit the specificity, but could reduce the complexity.
