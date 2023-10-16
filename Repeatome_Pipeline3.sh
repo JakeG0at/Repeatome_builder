@@ -75,8 +75,8 @@ read2="${Base}_N2_fixed.fastq"
 # Take a random sample of 1 million reads
 echo "Sampling 1 million reads..."
 start=$(date +%s.%N)
-seqtk sample -s100 "$read1" 500000 > sub1.fastq &
-seqtk sample -s100 "$read2" 500000 > sub2.fastq &
+seqtk sample -s100 "$read1" 2000000 > sub1.fastq &
+seqtk sample -s100 "$read2" 2000000 > sub2.fastq &
 wait
 end=$(date +%s.%N)
 runtime=$(echo "$end - $start" | bc)
@@ -106,7 +106,7 @@ seqtk seq -A merged.fastq > "${Base}"_sample.fasta
 echo "Running Repeat Explorer..."
 source activate /home/jlamb1/bin/miniconda3/envs/eccsplorer || { echo "Failed to activate conda environment"; exit 1; }
 
-/home/jlamb1/bin/repex_tarean/seqclust -p -A -v ./re_output -s 1000000 -c $threads -C -tax METAZOA3.0 -D BLASTX_W2 "${Base}"_sample.fasta
+/home/jlamb1/bin/repex_tarean/seqclust -p -A -v ./re_output -s 4000000 -c $threads -C -tax METAZOA3.0 -D BLASTX_W2 "${Base}"_sample.fasta
 # Check if Repeat Explorer was successful
 if [ $? -eq 0 ]; then
     echo "Repeat Explorer was successful"
