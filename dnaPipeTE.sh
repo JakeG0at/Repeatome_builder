@@ -27,10 +27,9 @@ python3 dnaPipeTE.py \
 -genome_coverage 0.15 \
 -RM_t 0.25 \
 -sample_number 2 \
+
 -RM_lib /home/jlamb1/Projects/combinedsalamanderlibrary.fasta
-
 EOF
-
 
 #################################################################################
 #usage: dnaPipeTE.py [-h] [-input [INPUT_FILE [INPUT_FILE ...]]]                #

@@ -167,84 +167,14 @@ runtime=$(echo "$end - $start" | bc)
 echo "Done removing duplicates in the library in $runtime seconds"
 
 #Ensure the reference library is indexed
+#echo number of sequences in the library
+echo "There are $(grep -c "^>" "$LibraryFile") unique sequences in the library file"
 echo "Indexing the reference library..."
 start=$(date +%s.%N)
 bwa index "$LibraryFile"
 end=$(date +%s.%N)
 runtime=$(echo "$end - $start" | bc)
 echo "Done indexing the reference library in $runtime seconds"
-
-echo "Mapping reads to the library..."
-# Map read1 and read2 to the library
-start=$(date +%s.%N)
-bwa mem -t $threads2 "$LibraryFile" "$read1" > "${Base}"_${Num_of_runs}_alignment1.sam &
-bwa mem -t $threads2 "$LibraryFile" "$read2" > "${Base}"_${Num_of_runs}_alignment2.sam &
-wait
-end=$(date +%s.%N)
-runtime=$(echo "$end - $start" | bc)
-echo "Done mapping reads to the library in $runtime seconds"
-
-# Convert SAM to BAM
-echo "Converting SAM to BAM..."
-start=$(date +%s.%N)
-samtools view -@ $threads2 -h -S -b "${Base}"_${Num_of_runs}_alignment1.sam > "${Base}"_${Num_of_runs}_alignment1.bam &
-samtools view -@ $threads2 -h -S -b "${Base}"_${Num_of_runs}_alignment2.sam > "${Base}"_${Num_of_runs}_alignment2.bam &
-wait
-end=$(date +%s.%N)
-runtime=$(echo "$end - $start" | bc)
-echo "Done converting SAM to BAM in $runtime seconds"
-
-# Sort the BAM file
-echo "Sorting BAM file..."
-start=$(date +%s.%N)
-samtools sort -@ $threads2 "${Base}"_${Num_of_runs}_alignment1.bam -o "${Base}"_${Num_of_runs}_alignment1_sorted.bam &
-samtools sort -@ $threads2 "${Base}"_${Num_of_runs}_alignment2.bam -o "${Base}"_${Num_of_runs}_alignment2_sorted.bam &
-wait
-end=$(date +%s.%N)
-runtime=$(echo "$end - $start" | bc)
-echo "Done sorting BAM file in $runtime seconds"
-
-# Filter out mapped reads
-echo "Filtering out mapped reads..."\
-start=$(date +%s.%N)
-samtools view -@ $threads2 -b -F 4 "${Base}"_${Num_of_runs}_alignment1_sorted.bam > "${Base}"_${Num_of_runs}_mapped_reads1.bam &
-samtools view -@ $threads2 -b -F 4 "${Base}"_${Num_of_runs}_alignment2_sorted.bam > "${Base}"_${Num_of_runs}_mapped_reads2.bam &
-wait
-end=$(date +%s.%N)
-runtime=$(echo "$end - $start" | bc)
-echo "Done filtering out mapped reads in $runtime seconds"
-
-# Get list of mapped read names
-echo "Getting list of mapped read names..."
-start=$(date +%s.%N)
-samtools view -@ $threads2 "${Base}"_${Num_of_runs}_mapped_reads1.bam | cut -f1 > "${Base}"_${Num_of_runs}_mapped_read_names1.txt &
-samtools view -@ $threads2 "${Base}"_${Num_of_runs}_mapped_reads2.bam | cut -f1 > "${Base}"_${Num_of_runs}_mapped_read_names2.txt &
-wait
-end=$(date +%s.%N)
-runtime=$(echo "$end - $start" | bc)
-echo "Done getting list of mapped read names in $runtime seconds"
-
-# Use seqtk to filter out mapped reads from the original FASTQ files
-echo "Filtering out mapped reads from the original FASTQ files Read1 and Read2"
-start=$(date +%s.%N)
-seqtk subseq "$read1" "${Base}"_${Num_of_runs}_mapped_read_names1.txt > "${Base}"_${Num_of_runs}_filtered1.fastq &
-seqtk subseq "$read2" "${Base}"_${Num_of_runs}_mapped_read_names2.txt > "${Base}"_${Num_of_runs}_filtered2.fastq &
-wait
-end=$(date +%s.%N)
-runtime=$(echo "$end - $start" | bc)
-echo "Done filtering out mapped reads from the original FASTQ files Read1 and Read2 in $runtime seconds"
-
-# Deactivate conda
-conda deactivate || { echo "Failed to deactivate conda environment"; exit 1; }
-echo "Done moving filtered FASTA to original FASTA"
-#remove temp files, but add a check to see if they exist first
-echo "Removing temp files"
-rm "${Base}"_${Num_of_runs}_mapped_read_names2.txt "${Base}"_${Num_of_runs}_mapped_read_names1.txt &
-rm "${Base}"_${Num_of_runs}_mapped_reads2.bam "${Base}"_${Num_of_runs}_mapped_reads1.bam &
-rm "${Base}"_${Num_of_runs}_alignment2.bam "${Base}"_${Num_of_runs}_alignment1.bam &
-rm "${Base}"_${Num_of_runs}_alignment2.sam "${Base}"_${Num_of_runs}_alignment1.sam &
-wait
-echo "Temp files removed"
 
 #move the re_output directory to the Repeat_explorer_outputs directory and add the number of runs to the end of the directory name
 mv ./re_output "$ProjectDir"/Repeat_explorer_outputs/re_output_${Num_of_runs} 

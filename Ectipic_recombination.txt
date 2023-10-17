@@ -1,0 +1,115 @@
+Plan:
+
+# Run dnaPipeTE for every Desmognathus genome
+
+
+
+#!/bin/bash
+
+#SBATCH --job-name=dnaPipeTE
+#SBATCH --cpus-per-task=32
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jlamb@crimson.ua.edu
+#SBATCH -N 1 #nodes
+#SBATCH -o dnaPipeTE_%j.o
+#SBATCH -e dnaPipeTE_%j.e
+
+cd "/home/jlamb1/Projects/"
+
+# Use singularity exec instead of shell to run the subsequent commands in the container
+singularity exec --bind ~/Projects/SRX19958881:/mnt ~/bin/dnaPipeTE/dnapipte.img /bin/bash <<EOF
+
+# Set locale environment variables to avoid locale warnings
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+
+cd /opt/dnaPipeTE
+
+python3 dnaPipeTE.py \
+-input /mnt/SRX19958881_N1.fastq \
+-output /mnt/dnaPipeTE_0.15_1_t25 \
+-cpu 32 \
+-genome_size 14500000000 \
+-genome_coverage 0.15 \
+-RM_t 0.25 \
+-sample_number 2 \
+-RM_lib /home/jlamb1/Projects/combinedsalamanderlibrary.fasta
+
+EOF
+
+
+#################################################################################
+#usage: dnaPipeTE.py [-h] [-input [INPUT_FILE [INPUT_FILE ...]]]                #
+#                    [-output OUTPUT_FOLDER] [-cpu CPU]                         #
+#                    [-sample_size SAMPLE_SIZE] [-sample_number SAMPLE_NUMBER]  #
+#                    [-genome_size GENOME_SIZE]                                 #
+#                    [-genome_coverage GENOME_COVERAGE]                         #
+#                    [-RM_lib REPEATMASKER_LIBRARY] [-species RM_SPECIES]       #
+#                    [-RM_t RM_THRESHOLD] [-Trin_glue TRINITY_GLUE]             #
+#                    [-contig_length CONTIG_LENGTH] [-keep_Trinity_output]      #
+#                                                                               #
+#optional arguments:                                                            #
+#  -h, --help            show this help message and exit                        #
+#  -input [INPUT_FILE [INPUT_FILE ...]]                                         #
+#                        input fastq files (two files for paired data)          #
+#  -output OUTPUT_FOLDER                                                        #
+#                        output folder                                          #
+#  -cpu CPU              maximum number of cpu to use                           #
+#  -sample_size SAMPLE_SIZE                                                     #
+#                        number of reads to sample                              #
+#  -sample_number SAMPLE_NUMBER                                                 #
+#                        number of sample to run                                #
+#  -genome_size GENOME_SIZE                                                     #
+#                        size of the genome                                     #
+#  -genome_coverage GENOME_COVERAGE                                             #
+#                        coverage of the genome                                 #
+#  -RM_lib REPEATMASKER_LIBRARY                                                 #
+#                        path to Repeatmasker library (if not set, the path     #
+#                        from the config file is used. The default library is   #
+#                        used by default)                                       #
+#  -species RM_SPECIES   default RepeatMasker library to use. Must be a valid   #
+#                        NCBI for species or clade ex: homo, drosophila, "ciona #
+#                        savignyi". Default All is used                         #
+#  -RM_t RM_THRESHOLD    minimal percentage of query hit on repeat to keep      #
+#                        anotation                                              #
+#  -Trin_glue TRINITY_GLUE                                                      #
+#                        number of reads to join Inchworm (k-mer) contigs       #
+#  -contig_length CONTIG_LENGTH                                                 #
+#                       minimum size of contig to report, default = 200 pb      #
+#  -keep_Trinity_output  keep Trinity output at the end of the run              #
+#################################################################################
+
+
+# Write a pipeline that takes the results and calculates the Ectopic Recombination rate
+
+
+
+
+
+
+Based on the provided text, here's a simplified outline of the bioinformatics pipeline:
+
+1. **Data Collection:**
+   - Download whole-genome data for selected species.
+   - Download LTR element consensus sequences from Repbase.
+   - Annotate elements lacking annotation using NCBI-BLAST2.
+
+2. **Solo LTR Levels Estimation (Whole-genome analysis):**
+   - Map terminal and internal sequences of each LTR retrotransposon consensus sequence to the corresponding genome using gsMapper.
+   - Filter the mapping results (≥80 bp in length and ≥80% identity).
+   - Parse the results to get the number of hits for terminal and internal consensus sequences and their lengths.
+   - Scale the number of hits by the length of the consensus sequence.
+   - Calculate the T:I ratio (Terminal to Internal sequence ratio) for genome-wide and for each individual LTR retrotransposon family.
+
+3. **Verification with Low-Coverage Shotgun Datasets:**
+   - Create a program to randomly extract shotgun-like sequences to create 1% genomic subsamples from the whole-genome datasets.
+   - Generate subsampled datasets with specified parameters (1% coverage, 50-500 bp read length).
+   - Estimate the T:I ratio for each subsampled dataset using the methods described in the whole-genome analysis.
+   - Compare the results from the subsampled datasets to the results from whole-genome analysis.
+
+4. **Solo LTR Levels Analysis in Salamander Shotgun Datasets:**
+   - Restrict the analysis to the most abundant LTR retrotransposon family in each salamander shotgun dataset.
+   - Exclude species with short reconstructed consensus terminal sequences (≤230 bp).
+   - Estimate the T:I ratio for the remaining species using the methods described in the whole-genome analysis.
+
+Now, to convert this outline into a bioinformatics pipeline diagram, various bioinformatics tools or graphical software can be used. Tools like Bioconda or platforms like BioStars often have relevant software packages for creating such diagrams. Alternatively, general-purpose diagramming tools like Visio or online platforms like Lucidchart could be used to visually represent the pipeline based on the steps outlined above.

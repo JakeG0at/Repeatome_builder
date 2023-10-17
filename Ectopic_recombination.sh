@@ -52,3 +52,7 @@ echo "Done unzipping files to Directory in $runtime seconds"
 
 read1="/home/jlamb1/Projects/Ectopic/$Base/${Base}_N1.fastq"
 read2="/home/jlamb1/Projects/Ectopic/$Base/${Base}_N2.fastq"
+
+echo "Finished setting up the environment at $(date)"
+
+
